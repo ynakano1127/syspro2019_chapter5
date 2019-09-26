@@ -2,6 +2,10 @@
 
 from smbus2 import SMBus
 import time
+import datetime
+import json
+import collections as cl
+import os.path
 
 bus_number  = 1
 i2c_address = 0x76
@@ -66,9 +70,15 @@ def readData():
 	temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
 	hum_raw  = (data[6] << 8)  |  data[7]
 	
-	compensate_T(temp_raw)
-	compensate_P(pres_raw)
-	compensate_H(hum_raw)
+	t = compensate_T(temp_raw)
+	p = compensate_P(pres_raw)
+	h = compensate_H(hum_raw)
+        return {
+                "time": datetime.datetime.now().isoformat(),
+                "temp": t,
+                "pres": p,
+                "hum": h,
+                }
 
 def compensate_P(adc_P):
 	global  t_fine
@@ -92,7 +102,7 @@ def compensate_P(adc_P):
 	v2 = ((pressure / 4.0) * digP[7]) / 8192.0
 	pressure = pressure + ((v1 + v2 + digP[6]) / 16.0)  
 
-	print "pressure : %7.2f hPa" % (pressure/100)
+	return pressure/100
 
 def compensate_T(adc_T):
 	global t_fine
@@ -100,7 +110,7 @@ def compensate_T(adc_T):
 	v2 = (adc_T / 131072.0 - digT[0] / 8192.0) * (adc_T / 131072.0 - digT[0] / 8192.0) * digT[2]
 	t_fine = v1 + v2
 	temperature = t_fine / 5120.0
-	print "temp : %-6.2f ℃" % (temperature) 
+	return temperature
 
 def compensate_H(adc_H):
 	global t_fine
@@ -114,7 +124,7 @@ def compensate_H(adc_H):
 		var_h = 100.0
 	elif var_h < 0.0:
 		var_h = 0.0
-	print "hum : %6.2f ％" % (var_h)
+	return var_h
 
 
 def setup():
@@ -138,11 +148,30 @@ def setup():
 setup()
 get_calib_param()
 
+def inputJson(data):
+    if not os.path.exists("output.json"):
+        f = open("output.json", "w")
+        f.write("{}")
+        f.close()
+    
+    f = open("output.json", "r")
+    json_data = json.load(f)
+    keys = list(map(lambda idx: int(idx[2:]), json_data.keys()))
+    next_key = "id1" if len(keys) == 0 else "id" + str(max(keys) + 1)
+    f.close()
+
+    f = open("output.json", "w")
+    json_data[next_key] = data
+    json.dump(json_data, f, indent=2)
+    f.close()
 
 if __name__ == '__main__':
     for i in range(10):
 	try:
-		readData()
-                time.sleep(10)
+		data = readData()
+                # print(data)
+                inputJson(data)
+                # time.sleep(10)
+                time.sleep(1)
 	except KeyboardInterrupt:
 		pass
