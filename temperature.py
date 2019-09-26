@@ -171,7 +171,7 @@ if __name__ == '__main__':
 		data = readData()
                 # print(data)
                 inputJson(data)
-                # time.sleep(10)
-                time.sleep(1)
+                time.sleep(10)
+                # time.sleep(1)
 	except KeyboardInterrupt:
 		pass
